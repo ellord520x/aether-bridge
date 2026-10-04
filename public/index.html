@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aether Omnichain 1:1 Bridge Gateway</title>
+  <meta name="description" content="Production-grade 1:1 cross-chain liquidity bridge with strict mathematical parity and zero fee slicing.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b'
+            },
+            surface: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glow-brand {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.35);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-surface-950">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-surface-950/80 backdrop-blur-md px-4 py-3 sm:px-6">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
+          <svg class="w-5 h-5 text-surface-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Aether Bridge</span>
+          <span class="hidden sm:inline-block ml-2 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 rounded">1:1 PARITY</span>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <div id="networkBadge" class="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-900 border border-slate-700 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-slate-500" id="networkDot"></span>
+          <span id="networkName">Disconnected</span>
+        </div>
+        <button id="walletBtn" onclick="toggleWalletConnect()" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-brand-500 to-emerald-400 hover:from-brand-600 hover:to-emerald-500 text-surface-950 shadow-md shadow-brand-500/20 active:scale-95">
+          Connect Wallet
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Bridge Core Container -->
+  <main class="flex-grow flex items-center justify-center p-3 sm:p-6 my-auto">
+    <div class="w-full max-w-lg glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+      <!-- Glow ambient light -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Protocol Governance Anchor Status -->
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800 text-[11px] text-slate-400">
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          Invariant: <strong class="text-slate-200 font-mono">principalOut === principalIn</strong>
+        </span>
+        <span class="font-mono text-slate-400 hidden sm:inline" title="Governance Anchor Authority">Anchor: 0x00a3...70dc</span>
+      </div>
+
+      <!-- Source Chain Card -->
+      <div class="bg-surface-900/90 rounded-2xl p-3.5 border border-slate-800">
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">From (Source Chain)</label>
+          <span class="text-xs text-slate-400" id="tokenBalanceLabel">Balance: <span class="font-mono text-slate-200" id="tokenBalance">0.00</span></span>
+        </div>
+
+        <div class="grid grid-cols-5 gap-2 items-center">
+          <div class="col-span-2">
+            <select id="sourceChainSelect" onchange="handleSourceChainChange()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs sm:text-sm font-medium text-white focus:outline-none focus:ring-1 focus:ring-brand-500">
+              <option value="1">Ethereum</option>
+              <option value="56">BNB Chain</option>
+              <option value="137">Polygon</option>
+              <option value="42161">Arbitrum</option>
+            </select>
+          </div>
+          <div class="col-span-3 relative">
+            <input type="number" id="transferAmount" oninput="calculateParityOutput()" placeholder="0.0" step="any" min="0" class="w-full bg-transparent font-mono text-xl sm:text-2xl text-right font-bold text-white focus:outline-none placeholder-slate-600 pr-12">
+            <button onclick="setMaxBalance()" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-brand-400 font-bold text-[10px] rounded uppercase transition-colors">Max</button>
+          </div>
+        </div>
+
+        <!-- Token Selector -->
+        <div class="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-800/80">
+          <div class="flex items-center space-x-2">
+            <select id="tokenSelect" onchange="handleTokenChange()" class="bg-slate-800/90 border border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-brand-400 focus:outline-none">
+              <option value="USDT">USDT</option>
+              <option value="USDC">USDC</option>
+              <option value="AETHER">AETHER (1:1)</option>
+            </select>
+            <span class="text-[11px] text-slate-500" id="tokenContractLabel">Canonical Vault Supported</span>
+          </div>
+          <span class="text-[11px] text-slate-400 font-mono" id="gasFeeEstimate">Gas: ~0.001 ETH</span>
+        </div>
+      </div>
+
+      <!-- Swap Chains Button -->
+      <div class="flex justify-center -my-2.5 relative z-10">
+        <button onclick="swapChains()" class="w-9 h-9 rounded-full bg-slate-800 border-2 border-slate-900 text-brand-400 flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all shadow-lg shadow-black/40">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Target Chain Card -->
+      <div class="bg-surface-900/90 rounded-2xl p-3.5 border border-slate-800">
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">To (Destination Chain)</label>
+          <span class="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            0% Protocol Slashing
+          </span>
+        </div>
+
+        <div class="grid grid-cols-5 gap-2 items-center">
+          <div class="col-span-2">
+            <select id="targetChainSelect" onchange="handleTargetChainChange()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs sm:text-sm font-medium text-white focus:outline-none focus:ring-1 focus:ring-brand-500">
+              <option value="56">BNB Chain</option>
+              <option value="1">Ethereum</option>
+              <option value="137">Polygon</option>
+              <option value="42161">Arbitrum</option>
+            </select>
+          </div>
+          <div class="col-span-3">
+            <div id="guaranteedOutput" class="w-full font-mono text-xl sm:text-2xl text-right font-bold text-emerald-400 truncate">
+              0.0
+            </div>
+          </div>
+        </div>
+
+        <!-- Recipient Address Field -->
+        <div class="mt-3 pt-2.5 border-t border-slate-800/80">
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-[11px] text-slate-400">Destination Receiver Address</label>
+            <button onclick="useSelfAddress()" class="text-[10px] text-brand-400 hover:underline">Same as sender</button>
+          </div>
+          <input type="text" id="receiverAddress" placeholder="0x..." class="w-full bg-slate-800/90 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500">
+        </div>
+      </div>
+
+      <!-- Strict 1:1 Invariant Summary Card -->
+      <div class="mt-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-xs">
+        <div class="flex justify-between text-slate-400">
+          <span>Bridge Mechanism</span>
+          <span class="text-slate-200 font-medium" id="mechanismIndicator">Canonical Lock & Release</span>
+        </div>
+        <div class="flex justify-between text-slate-400">
+          <span>Fee Policy</span>
+          <span class="text-emerald-400 font-medium">Exclusively Native Gas (Zero Principal Fee)</span>
+        </div>
+        <div class="flex justify-between text-slate-400">
+          <span>Invariant Assertion</span>
+          <span class="text-emerald-400 font-mono font-bold">principalOut === principalIn</span>
+        </div>
+      </div>
+
+      <!-- Action Button Area (Dual-step Flow: Approve -> Bridge) -->
+      <div class="mt-5 space-y-2">
+        <button id="actionBtn" onclick="handleBridgeAction()" class="w-full py-3.5 px-4 rounded-xl font-bold text-sm tracking-wide bg-gradient-to-r from-brand-500 via-emerald-400 to-teal-400 hover:from-brand-600 hover:to-emerald-500 text-surface-950 transition-all duration-200 shadow-lg shadow-brand-500/25 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
+          Connect Web3 Wallet
+        </button>
+        <p id="statusMsg" class="text-center text-xs font-mono text-slate-400 min-h-[18px]"></p>
+      </div>
+
+      <!-- Live Transaction Audit Feedback -->
+      <div id="txAuditBox" class="hidden mt-4 p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/60">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            Transaction Dispatched
+          </span>
+          <a id="txHashLink" href="#" target="_blank" class="text-xs font-mono text-cyan-400 hover:underline">View Explorer &nearr;</a>
+        </div>
+        <div class="text-[11px] font-mono text-slate-400 mt-1 truncate" id="txHashText">0x...</div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 px-4 py-3 text-center text-xs text-slate-600">
+    Aether Omnichain Runtime v8.0.0-ENTERPRISE &bull; Deterministic Invariant Enforcement Engine
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    // --- Supported Chains Configuration ---
+    const CHAINS = {
+      1: {
+        chainId: '0x1',
+        idNum: 1,
+        name: 'Ethereum Mainnet',
+        symbol: 'ETH',
+        decimals: 18,
+        vault: '0x32A42111E935c6E0c663F023DbD1eFa8c9c0F19E',
+        explorer: 'https://etherscan.io',
+        nativeGasFeeWei: '1000000000000000' // 0.001 ETH
+      },
+      56: {
+        chainId: '0x38',
+        idNum: 56,
+        name: 'BNB Smart Chain',
+        symbol: 'BNB',
+        decimals: 18,
+        vault: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+        explorer: 'https://bscscan.com',
+        nativeGasFeeWei: '2000000000000000' // 0.002 BNB
+      },
+      137: {
+        chainId: '0x89',
+        idNum: 137,
+        name: 'Polygon PoS',
+        symbol: 'POL',
+        decimals: 18,
+        vault: '0x1C13E78eF46C652458a2F590899fa1b585eaF305',
+        explorer: 'https://polygonscan.com',
+        nativeGasFeeWei: '500000000000000000' // 0.5 POL
+      },
+      42161: {
+        chainId: '0xa4b1',
+        idNum: 42161,
+        name: 'Arbitrum One',
+        symbol: 'ETH',
+        decimals: 18,
+        vault: '0x22C74744EbDEd39eA284Db465B203649646c0dC3',
+        explorer: 'https://arbiscan.io',
+        nativeGasFeeWei: '500000000000000' // 0.0005 ETH
+      }
+    };
+
+    // Canonical ERC-20 Tokens Mock Configuration (Contract addresses on mainnets)
+    const TOKENS = {
+      USDT: { symbol: 'USDT', decimals: 6, address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
+      USDC: { symbol: 'USDC', decimals: 6, address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+      AETHER: { symbol: 'AETHER', decimals: 18, address: '0x55d398326f99059fF775485246999027B3197955' }
+    };
+
+    // Minimal ABIs
+    const ERC20_ABI = [
+      'function balanceOf(address owner) view returns (uint256)',
+      'function allowance(address owner, address spender) view returns (uint256)',
+      'function approve(address spender, uint256 amount) returns (bool)'
+    ];
+
+    const BRIDGE_VAULT_ABI = [
+      'function bridgeTokens(address token, uint256 amount, uint256 targetChainId, address receiver) payable returns (bytes32)'
+    ];
+
+    // State
+    let provider = null;
+    let signer = null;
+    let userAddress = null;
+    let currentChainId = null;
+    let currentAllowance = 0n;
+
+    // Elements
+    const walletBtn = document.getElementById('walletBtn');
+    const networkBadge = document.getElementById('networkBadge');
+    const networkDot = document.getElementById('networkDot');
+    const networkName = document.getElementById('networkName');
+    const sourceChainSelect = document.getElementById('sourceChainSelect');
+    const targetChainSelect = document.getElementById('targetChainSelect');
+    const transferAmountInput = document.getElementById('transferAmount');
+    const guaranteedOutput = document.getElementById('guaranteedOutput');
+    const receiverAddressInput = document.getElementById('receiverAddress');
+    const actionBtn = document.getElementById('actionBtn');
+    const statusMsg = document.getElementById('statusMsg');
+    const tokenBalanceEl = document.getElementById('tokenBalance');
+    const gasFeeEstimateEl = document.getElementById('gasFeeEstimate');
+    const txAuditBox = document.getElementById('txAuditBox');
+    const txHashLink = document.getElementById('txHashLink');
+    const txHashText = document.getElementById('txHashText');
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      checkProviderAvailability();
+      updateGasFeeEstimation();
+    });
+
+    function checkProviderAvailability() {
+      if (window.ethereum) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        window.ethereum.on('accountsChanged', handleAccountsChanged);
+        window.ethereum.on('chainChanged', handleChainChanged);
+      }
+    }
+
+    async function toggleWalletConnect() {
+      if (!window.ethereum) {
+        alert('Web3 Provider not found. Please open in MetaMask Mobile or a Web3 Browser.');
+        return;
+      }
+      try {
+        statusMsg.innerText = 'Connecting to Web3 Provider...';
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        handleAccountsChanged(accounts);
+      } catch (err) {
+        statusMsg.innerText = 'Connection rejected: ' + err.message;
+      }
+    }
+
+    async function handleAccountsChanged(accounts) {
+      if (accounts && accounts.length > 0) {
+        userAddress = accounts[0];
+        signer = await provider.getSigner();
+        walletBtn.innerText = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
+        receiverAddressInput.value = userAddress;
+
+        const network = await provider.getNetwork();
+        currentChainId = Number(network.chainId);
+        updateNetworkUI(currentChainId);
+        await refreshUserData();
+      } else {
+        userAddress = null;
+        signer = null;
+        walletBtn.innerText = 'Connect Wallet';
+        networkBadge.classList.add('hidden');
+        actionBtn.innerText = 'Connect Web3 Wallet';
+      }
+    }
+
+    function handleChainChanged(chainIdHex) {
+      currentChainId = parseInt(chainIdHex, 16);
+      updateNetworkUI(currentChainId);
+      refreshUserData();
+    }
+
+    function updateNetworkUI(chainId) {
+      networkBadge.classList.remove('hidden');
+      const chain = CHAINS[chainId];
+      if (chain) {
+        networkName.innerText = chain.name;
+        networkDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        sourceChainSelect.value = chainId;
+      } else {
+        networkName.innerText = `Chain ${chainId}`;
+        networkDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+      }
+      ensureDistinctChains();
+      updateGasFeeEstimation();
+    }
+
+    async function refreshUserData() {
+      if (!userAddress || !signer) return;
+      const selectedTokenKey = document.getElementById('tokenSelect').value;
+      const tokenMeta = TOKENS[selectedTokenKey];
+      const sourceChainId = Number(sourceChainSelect.value);
+      const vaultAddress = CHAINS[sourceChainId]?.vault;
+
+      try {
+        const tokenContract = new ethers.Contract(tokenMeta.address, ERC20_ABI, signer);
+        const [bal, allow] = await Promise.all([
+          tokenContract.balanceOf(userAddress).catch(() => 0n),
+          vaultAddress ? tokenContract.allowance(userAddress, vaultAddress).catch(() => 0n) : 0n
+        ]);
+
+        tokenBalanceEl.innerText = ethers.formatUnits(bal, tokenMeta.decimals);
+        currentAllowance = allow;
+        updateActionButtonState();
+      } catch (err) {
+        console.warn('Balance query warning:', err.message);
+      }
+    }
+
+    function calculateParityOutput() {
+      const val = transferAmountInput.value;
+      // Invariant: principalOut === principalIn
+      guaranteedOutput.innerText = (val && !isNaN(val) && parseFloat(val) > 0) ? val : '0.0';
+      updateActionButtonState();
+    }
+
+    function setMaxBalance() {
+      const bal = tokenBalanceEl.innerText;
+      if (bal && bal !== '0.00') {
+        transferAmountInput.value = bal;
+        calculateParityOutput();
+      }
+    }
+
+    function useSelfAddress() {
+      if (userAddress) {
+        receiverAddressInput.value = userAddress;
+      }
+    }
+
+    function swapChains() {
+      const currentSrc = sourceChainSelect.value;
+      const currentTarget = targetChainSelect.value;
+      sourceChainSelect.value = currentTarget;
+      targetChainSelect.value = currentSrc;
+      ensureDistinctChains();
+      updateGasFeeEstimation();
+      refreshUserData();
+    }
+
+    function handleSourceChainChange() {
+      ensureDistinctChains();
+      updateGasFeeEstimation();
+      promptSwitchNetwork(Number(sourceChainSelect.value));
+      refreshUserData();
+    }
+
+    function handleTargetChainChange() {
+      ensureDistinctChains();
+      updateGasFeeEstimation();
+    }
+
+    function handleTokenChange() {
+      refreshUserData();
+    }
+
+    function ensureDistinctChains() {
+      if (sourceChainSelect.value === targetChainSelect.value) {
+        for (const id of Object.keys(CHAINS)) {
+          if (id !== sourceChainSelect.value) {
+            targetChainSelect.value = id;
+            break;
+          }
+        }
+      }
+    }
+
+    function updateGasFeeEstimation() {
+      const srcId = sourceChainSelect.value;
+      const chain = CHAINS[srcId];
+      if (chain) {
+        const feeEth = ethers.formatEther(chain.nativeGasFeeWei);
+        gasFeeEstimateEl.innerText = `Gas: ~${feeEth} ${chain.symbol}`;
+      }
+    }
+
+    async function promptSwitchNetwork(targetChainNum) {
+      if (!window.ethereum) return;
+      const chainHex = '0x' + targetChainNum.toString(16);
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainHex }]
+        });
+      } catch (err) {
+        console.warn('Network switch request:', err.message);
+      }
+    }
+
+    function updateActionButtonState() {
+      if (!userAddress) {
+        actionBtn.innerText = 'Connect Web3 Wallet';
+        actionBtn.disabled = false;
+        return;
+      }
+
+      const inputVal = transferAmountInput.value;
+      const amount = parseFloat(inputVal);
+      if (!amount || amount <= 0) {
+        actionBtn.innerText = 'Enter Amount';
+        actionBtn.disabled = true;
+        return;
+      }
+
+      const tokenKey = document.getElementById('tokenSelect').value;
+      const tokenDecimals = TOKENS[tokenKey].decimals;
+      const amountWei = ethers.parseUnits(inputVal, tokenDecimals);
+
+      if (currentAllowance < amountWei) {
+        actionBtn.innerText = `Step 1: Approve ${tokenKey}`;
+        actionBtn.disabled = false;
+      } else {
+        actionBtn.innerText = 'Step 2: Bridge (1:1 Parity)';
+        actionBtn.disabled = false;
+      }
+    }
+
+    async function handleBridgeAction() {
+      if (!userAddress) {
+        await toggleWalletConnect();
+        return;
+      }
+
+      const srcChainId = Number(sourceChainSelect.value);
+      const targetChainId = Number(targetChainSelect.value);
+      const receiver = receiverAddressInput.value.trim();
+      const amountStr = transferAmountInput.value;
+
+      if (!ethers.isAddress(receiver)) {
+        statusMsg.innerText = 'Error: Invalid recipient address format.';
+        return;
+      }
+
+      const tokenKey = document.getElementById('tokenSelect').value;
+      const tokenMeta = TOKENS[tokenKey];
+      const amountWei = ethers.parseUnits(amountStr, tokenMeta.decimals);
+      const vaultAddress = CHAINS[srcChainId]?.vault;
+
+      actionBtn.disabled = true;
+
+      try {
+        const tokenContract = new ethers.Contract(tokenMeta.address, ERC20_ABI, signer);
+
+        // STEP 1: APPROVAL
+        if (currentAllowance < amountWei) {
+          statusMsg.innerText = `Waiting for ${tokenKey} approval signature...`;
+          const approveTx = await tokenContract.approve(vaultAddress, ethers.MaxUint256);
+          statusMsg.innerText = 'Broadcasting approval transaction...';
+          await approveTx.wait(1);
+          currentAllowance = ethers.MaxUint256;
+          statusMsg.innerText = 'Approval confirmed! Proceeding to Bridge...';
+          updateActionButtonState();
+          actionBtn.disabled = false;
+          return;
+        }
+
+        // STEP 2: BRIDGE EXECUTION (Exact 1:1 Invariant Guarantee)
+        statusMsg.innerText = 'Preparing Bridge transaction with native gas settlement...';
+        const bridgeContract = new ethers.Contract(vaultAddress, BRIDGE_VAULT_ABI, signer);
+        const requiredNativeFee = CHAINS[srcChainId]?.nativeGasFeeWei || '1000000000000000';
+
+        const tx = await bridgeContract.bridgeTokens(
+          tokenMeta.address,
+          amountWei,
+          targetChainId,
+          receiver,
+          { value: requiredNativeFee }
+        );
+
+        statusMsg.innerText = 'Broadcasting to Mainnet...';
+        txAuditBox.classList.remove('hidden');
+        txHashText.innerText = tx.hash;
+        txHashLink.href = `${CHAINS[srcChainId].explorer}/tx/${tx.hash}`;
+
+        await tx.wait(1);
+        statusMsg.innerText = '✅ Bridge transfer initiated! Inbound relayer tracking active.';
+        await refreshUserData();
+      } catch (err) {
+        console.error(err);
+        statusMsg.innerText = 'Transaction Failed: ' + (err.reason || err.message);
+      } finally {
+        actionBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+            </html>
