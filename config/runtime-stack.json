@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Global Omnichain Polyglot Stack & Production Mainnet Runtime",
+  "version": "8.0.0-ENTERPRISE",
+  "environment": "production-mainnet-exclusive",
+  "polyglotCompilerMatrix": {
+    "solidity": {
+      "version": "0.8.24",
+      "settings": {
+        "evmVersion": "cancun",
+        "viaIR": true,
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "metadata": {
+          "bytecodeHash": "none"
+        }
+      }
+    },
+    "typescript": {
+      "target": "ES2022",
+      "module": "NodeNext",
+      "moduleResolution": "NodeNext",
+      "moduleType": "Native ESM",
+      "strict": true,
+      "noImplicitAny": true,
+      "strictNullChecks": true,
+      "exactOptionalPropertyTypes": true
+    },
+    "rustWorkerCore": {
+      "engine": "WASM / Native Bridge Relayer Worker",
+      "zeroMemoryLeakPolicy": true,
+      "allocator": "jemalloc",
+      "optLevel": 3,
+      "lto": "fat"
+    }
+  },
+  "governance": {
+    "anchorAuthority": "0x00a3b4f0688734ef0c6086f126b12d5ffe2070dc",
+    "signatureStandards": ["EIP-191", "EIP-712"],
+    "asymmetricProofScheme": "RSA-4096-PSS-SHA256",
+    "antiInspectionPolicy": {
+      "status": "ARMED",
+      "memoryScrubbing": true,
+      "debuggerDetachment": true,
+      "quarantineOnTamper": true,
+      "ptraceDeny": true
+    }
+  },
+  "protocolInvariants": {
+    "strictParityInvariant": "principalOut === principalIn",
+    "parityGuarantee": "100% Deterministic 1:1 Parity",
+    "slashingDeduction": 0.0,
+    "gasBillingPolicy": "Strictly Native Currencies",
+    "supportedNativeGasAssets": ["ETH", "BNB", "POL"],
+    "swarmGasBuffer": 1.25,
+    "antiReplayEngine": {
+      "mechanism": "Keccak256 State Nonce Registry",
+      "ttlSeconds": 900,
+      "autoPurgeIntervalSeconds": 60
+    }
+  },
+  "daemonInfrastructure": {
+    "ingressPort": 8081,
+    "host": "0.0.0.0",
+    "autoIncrementCollisionGuard": {
+      "enabled": true,
+      "maxPortAttempts": 30,
+      "fallbackIncrement": 1
+    },
+    "rateLimiter": {
+      "windowMs": 60000,
+      "maxRequests": 180
+    },
+    "circuitBreaker": {
+      "failureThreshold": 5,
+      "cooldownMs": 45000,
+      "halfOpenProbes": 3
+    }
+  },
+  "mainnetChains": {
+    "1": {
+      "chainId": 1,
+      "network": "ethereum-mainnet",
+      "name": "Ethereum Mainnet",
+      "nativeGasSymbol": "ETH",
+      "decimals": 18,
+      "confirmationDepth": 12,
+      "mechanism": "CANONICAL_VAULT_LOCK",
+      "vaultContractAddress": "${MAINNET_ETH_VAULT_ADDRESS}",
+      "primaryRpcEndpoint": "${MAINNET_ETH_RPC}",
+      "fallbackRpcEndpoints": "${MAINNET_ETH_FALLBACK_RPCS}",
+      "blockTimeMs": 12000
+    },
+    "56": {
+      "chainId": 56,
+      "network": "bsc-mainnet",
+      "name": "BNB Smart Chain Mainnet",
+      "nativeGasSymbol": "BNB",
+      "decimals": 18,
+      "confirmationDepth": 15,
+      "mechanism": "CANONICAL_BURN_MINT",
+      "vaultContractAddress": "${MAINNET_BSC_VAULT_ADDRESS}",
+      "primaryRpcEndpoint": "${MAINNET_BSC_RPC}",
+      "fallbackRpcEndpoints": "${MAINNET_BSC_FALLBACK_RPCS}",
+      "blockTimeMs": 3000
+    },
+    "137": {
+      "chainId": 137,
+      "network": "polygon-mainnet",
+      "name": "Polygon PoS Mainnet",
+      "nativeGasSymbol": "POL",
+      "decimals": 18,
+      "confirmationDepth": 64,
+      "mechanism": "CANONICAL_BURN_MINT",
+      "vaultContractAddress": "${MAINNET_POLYGON_VAULT_ADDRESS}",
+      "primaryRpcEndpoint": "${MAINNET_POLYGON_RPC}",
+      "fallbackRpcEndpoints": "${MAINNET_POLYGON_FALLBACK_RPCS}",
+      "blockTimeMs": 2200
+    },
+    "42161": {
+      "chainId": 42161,
+      "network": "arbitrum-one-mainnet",
+      "name": "Arbitrum One Mainnet",
+      "nativeGasSymbol": "ETH",
+      "decimals": 18,
+      "confirmationDepth": 20,
+      "mechanism": "L2_ROLLUP_MINT",
+      "vaultContractAddress": "${MAINNET_ARBITRUM_VAULT_ADDRESS}",
+      "primaryRpcEndpoint": "${MAINNET_ARBITRUM_RPC}",
+      "fallbackRpcEndpoints": "${MAINNET_ARBITRUM_FALLBACK_RPCS}",
+      "blockTimeMs": 250
+    }
+  }
+}
