@@ -1,0 +1,66 @@
+{
+  "name": "omnichain-bridge-1to1",
+  "version": "8.0.0-ENTERPRISE",
+  "description": "Production-grade 1:1 cross-chain liquidity bridge relayer and smart contract ecosystem",
+  "main": "daemons/unified-bridge-relayer.js",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "start": "node scripts/unified-bridge-runner.js",
+    "bridge:unified": "node scripts/unified-bridge-runner.js",
+    "bridge:daemon": "node daemons/unified-bridge-relayer.js",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.4",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.12",
+    "@openzeppelin/contracts": "^5.2.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.20",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.13.1",
+    "hardhat": "^2.22.18",
+    "hardhat-gas-reporter": "^2.2.2",
+    "solidity-coverage": "^0.8.14",
+    "typechain": "^8.3.2",
+    "typescript": "^5.7.3"
+  },
+  "keywords": [
+    "cross-chain",
+    "bridge",
+    "relayer",
+    "ethereum",
+    "binance-smart-chain",
+    "polygon",
+    "arbitrum",
+    "ethers-v6",
+    "web3",
+    "zero-slashing",
+    "deterministic-parity"
+  ],
+  "author": "Autonomous Cross-Chain Architecture Team",
+  "license": "MIT"
+}
