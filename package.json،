@@ -1,0 +1,14 @@
+{
+  "name": "aether-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test/bridge.test.js",
+    "relayer:2": "node daemons/unified-bridge-relayer-2.js",
+    "start:relayer": "node daemons/unified-bridge-relayer-2.js",
+    "start": "node dist/server.cjs"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0"
+  }
+}
