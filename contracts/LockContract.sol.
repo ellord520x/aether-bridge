@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
+/**
+ * @title LockContract
+ * @notice Enterprise-grade canonical token vault for Ethereum Mainnet cross-chain liquidity.
+ *         Enforces deterministic 1:1 asset parity with zero fee deductions, zero dynamic pricing,
+ *         sequential nonce management, and OpenZeppelin emergency controls.
+ */
+contract LockContract is ReentrancyGuard, Pausable, Ownable {
+    using SafeERC20 for IERC20;
+
+    // --- IMMUTABLE ANCHOR ---
+    address public constant GOVERNANCE_ANCHOR = 0x00a3b4f0688734ef0c6086f126b12d5ffe2070dc;
+
+    // --- NONCE & AUDIT STATE ---
+    uint256 public globalNonce;
+    mapping(address => uint256) public userNonces;
+    mapping(address => bool) public supportedTokens;
+    mapping(bytes32 => bool) public executedLockHashes;
+
+    // --- CUSTOM ERRORS ---
+    error ZeroAmount();
+    error ZeroAddress();
+    error EmptyTargetChain();
+    error TokenNotSupported(address token);
+    error ParityInvariantViolation(uint256 expected, uint256 actual);
+
+    // --- EVENTS ---
+    event TokensLocked(
+        address indexed sender,
+        uint256 amount,
+        uint256 nonce,
+        string targetChain
+    );
+
+    event TokenSupportUpdated(address indexed token, bool isSupported);
+
+    /**
+     * @notice Initializes the contract with an administrative owner.
+     * @param initialOwner Address of the governance administrator.
+     */
+    constructor(address initialOwner)
+        Ownable(initialOwner == address(0) ? GOVERNANCE_ANCHOR : initialOwner)
+    {}
+
+    /**
+     * @notice Locks ERC-20 tokens into the vault with strict 1:1 parity and sequential nonce tracking.
+     * @param token Address of the ERC-20 token to lock.
+     * @param amount Exact quantity of tokens to bridge (zero deductions applied).
+     * @param targetChain Destination blockchain identifier (e.g. "BSC", "Polygon", "Arbitrum").
+     * @return assignedNonce The sequential global nonce assigned to this lock transaction.
+     */
+    function lockTokens(
+        address token,
+        uint256 amount,
+        string calldata targetChain
+    ) external nonReentrant whenNotPaused returns (uint256 assignedNonce) {
+        if (amount == 0) revert ZeroAmount();
+        if (token == address(0)) revert ZeroAddress();
+        if (bytes(targetChain).length == 0) revert EmptyTargetChain();
+        if (!supportedTokens[token]) revert TokenNotSupported(token);
+
+        // Sequential Nonce Assignment
+        assignedNonce = ++globalNonce;
+        userNonces[msg.sender]++;
+
+        // Strict 1:1 Token Conservation Invariant Check
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+
+        uint256 actualReceived = balanceAfter - balanceBefore;
+        if (actualReceived != amount) {
+            revert ParityInvariantViolation(amount, actualReceived);
+        }
+
+        // Prevent Duplicate Execution Collisions
+        bytes32 lockHash = keccak256(
+            abi.encodePacked(msg.sender, token, amount, assignedNonce, targetChain, block.chainid)
+        );
+        executedLockHashes[lockHash] = true;
+
+        emit TokensLocked(
+            msg.sender,
+            amount,
+            assignedNonce,
+            targetChain
+        );
+
+        return assignedNonce;
+    }
+
+    // --- ADMIN GOVERNANCE FUNCTIONS ---
+
+    /**
+     * @notice Enables or disables an ERC-20 token for cross-chain custody.
+     * @param token The ERC-20 token address.
+     * @param isSupported Enable (true) or disable (false).
+     */
+    function setTokenSupport(address token, bool isSupported) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
+        supportedTokens[token] = isSupported;
+        emit TokenSupportUpdated(token, isSupported);
+    }
+
+    /**
+     * @notice Emergency circuit breaker to pause token deposits.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses contract operations.
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+}
