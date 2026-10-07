@@ -1,0 +1,7 @@
+# Execute unit test suite with node:assert
+node test/bridge.test.js
+# or: npm test
+
+# Launch production Relayer v2 daemon
+node daemons/unified-bridge-relayer-2.js
+# or: npm run relayer:2
