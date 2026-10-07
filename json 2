@@ -1,0 +1,46 @@
+{
+  "name": "aether-bridge",
+  "version": "8.0.0-ENTERPRISE",
+  "description": "Production-grade 1:1 omnichain liquidity bridge protocol and autonomous swarm relayer",
+  "main": "scripts/swarm-master.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node scripts/swarm-master.js",
+    "relayer": "node daemons/unified-bridge-relayer.js",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "build": "hardhat compile && echo Build Complete"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "winston": "^3.13.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.7",
+    "@nomicfoundation/hardhat-ethers": "^3.0.6",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "chai": "^4.3.10",
+    "hardhat": "^2.22.5",
+    "mocha": "^10.4.0"
+  },
+  "keywords": [
+    "cross-chain",
+    "bridge",
+    "ethereum",
+    "binance-smart-chain",
+    "relayer",
+    "ethers-v6",
+    "smart-contracts",
+    "hardhat"
+  ],
+  "author": "Autonomous Cross-Chain Architecture Team",
+  "license": "MIT"
+}
