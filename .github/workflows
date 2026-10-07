@@ -1,0 +1,45 @@
+name: Self-Healing Automation Pipeline
+
+on:
+  repository_dispatch:
+    types: [sentry_error]
+
+jobs:
+  auto-heal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: 2. Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Install Dependencies
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+          fi
+
+      - name: 4. Configure Git Identity
+        run: |
+          git config --global user.name "Self-Healing-Bot"
+          git config --global user.email "bot@github.com"
+
+      - name: 5. Run AI Fixer Orchestrator
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          SENTRY_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: node scripts/ai-fixer.js
+
+      - name: 6. Auto Merge & Push to Main
+        run: |
+          git checkout main
+          git merge fix/auto-heal-patch --no-ff -m "fix(self-healing): automatic patch applied & verified"
+          git push origin main
